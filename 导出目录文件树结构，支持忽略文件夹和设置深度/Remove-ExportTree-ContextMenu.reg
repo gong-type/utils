@@ -1,0 +1,8 @@
+Windows Registry Editor Version 5.00
+
+[-HKEY_CLASSES_ROOT\Directory\shell\ExportTree]
+[-HKEY_CLASSES_ROOT\Directory\Background\shell\ExportTree]
+[-HKEY_CLASSES_ROOT\Directory\shell\OutputStructureTree]
+[-HKEY_CLASSES_ROOT\Directory\Background\shell\OutputStructureTree]
+[-HKEY_CLASSES_ROOT\Directory\shell\输出结构树]
+[-HKEY_CLASSES_ROOT\Directory\Background\shell\输出结构树]
