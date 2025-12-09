@@ -44,6 +44,13 @@
 - **使用**: 右键文件夹 → "输出结构树"，或运行 `Export-DirectoryTree.ps1`（命令行版）
 - **使用说明**: 查看 `使用说明.md`
 
+### NPM 全局更新检查
+一个交互式 PowerShell 工具，用于查看、更新、安装、卸载 npm 全局包，并检查 npm 自身状态。
+
+- **功能**: 列表、检测可更新、一键全量更新、指定包更新/卸载/安装、查看 npm 状态
+- **特色**: 终端菜单式操作、中文提示、带确认的危险操作
+- **使用说明**: 查看 `NPM全局更新检查/README.md`
+
 ## 📁 项目结构
 
 ```
@@ -65,6 +72,9 @@ utils/
 │   ├── Add-ExportTree-ContextMenu.reg    # 添加右键菜单
 │   ├── Remove-ExportTree-ContextMenu.reg # 移除右键菜单
 │   └── 使用说明.md
+├── NPM全局更新检查/                       # npm 全局包交互管理
+│   ├── npm-manager.ps1
+│   └── README.md
 └── README.md                                       # 项目说明文件
 ```
 
@@ -86,6 +96,12 @@ dotnet publish -c Release -o bin\Release\publish
 1. 复制 `ExportTree-ContextMenu.ps1` 到 `C:\Scripts\`
 2. 双击运行 `Add-ExportTree-ContextMenu.reg` 添加右键菜单
 3. 右键文件夹 → "输出结构树"
+
+### NPM 全局更新检查
+```powershell
+cd "NPM全局更新检查"
+powershell.exe -File .\npm-manager.ps1
+```
 
 ## ⚠️ 注意事项
 
