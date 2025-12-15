@@ -1,6 +1,7 @@
 ﻿<#
 .SYNOPSIS
-    Permanent Delete Core - Pure Speed Edition
+    Permanent Delete Core - Pure Speed Edition v3.4
+    Added: UNC path support for Windows reserved names (nul, con, aux, etc.)
 #>
 
 param(
@@ -11,10 +12,8 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-# Critical System Processes White-list
 $CriticalProcesses = @("explorer","csrss","wininit","winlogon","services","lsass","smss","System","svchost","dwm","spoolsv")
 
-# Use minimal UI
 Add-Type -AssemblyName System.Windows.Forms
 
 if ($Paths.Count -eq 0) { exit }
@@ -80,9 +79,19 @@ function Relaunch-Admin {
 
 function Needs-Elev {
     param($p)
-    if ($p -match "^$($env:SystemRoot -replace '\\','\\')" -or $p -match "^$($env:ProgramFiles -replace '\\','\\')") { return $true }
+    if ($p -match "^$($env:SystemRoot -replace '\\','\\')") { return $true }
+    if ($p -match "^$($env:ProgramFiles -replace '\\','\\')") { return $true }
     try { [System.IO.File]::Open($p,[System.IO.FileMode]::Open,[System.IO.FileAccess]::ReadWrite).Dispose() } catch [System.UnauthorizedAccessException] { return $true } catch {}
     return $false
+}
+
+# Convert to UNC path for reserved name handling
+function Get-UNCPath {
+    param([string]$Path)
+    $Path = $Path.Trim().Trim('"')
+    if ($Path.StartsWith("\\?\")) { return $Path }
+    if ($Path.StartsWith("\\")) { return "\\?\UNC\" + $Path.Substring(2) }
+    return "\\?\" + $Path
 }
 
 # Elevation Check
@@ -94,31 +103,56 @@ $Failed = @()
 
 foreach ($raw in $Paths) {
     $T = $raw.Trim().Trim('"')
-    if (-not (Test-Path -LiteralPath $T)) { continue }
+    $UNC = Get-UNCPath $T
+    
+    # Check existence using both normal and UNC paths
+    $exists = (Test-Path -LiteralPath $T -ErrorAction SilentlyContinue) -or (Test-Path -LiteralPath $UNC -ErrorAction SilentlyContinue)
+    if (-not $exists) { continue }
 
-    # 1. Clear ReadOnly
+    # 1. Clear ReadOnly (try both paths)
     try {
-        $i = Get-Item -LiteralPath $T -Force
-        if ($i.Attributes -band 1) { $i.Attributes -= 1 }
-        if ($i.PSIsContainer) { Get-ChildItem -LiteralPath $T -Recurse -Force -ErrorAction 0 | % { if ($_.Attributes -band 1) { $_.Attributes -= 1 } } }
+        $i = Get-Item -LiteralPath $T -Force -ErrorAction SilentlyContinue
+        if ($null -eq $i) { $i = Get-Item -LiteralPath $UNC -Force -ErrorAction SilentlyContinue }
+        if ($null -ne $i) {
+            if ($i.Attributes -band 1) { $i.Attributes -= 1 }
+            if ($i.PSIsContainer) { 
+                Get-ChildItem -LiteralPath $UNC -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { 
+                    if ($_.Attributes -band 1) { $_.Attributes -= 1 } 
+                }
+            }
+        }
     } catch {}
 
-    # 2. Try Delete
-    try { Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction Stop; continue } catch {}
+    # 2. Try Delete with UNC path (handles reserved names)
+    try { 
+        Remove-Item -LiteralPath $UNC -Recurse -Force -ErrorAction Stop
+        continue 
+    } catch {}
+    
+    # 3. Fallback: Try normal path
+    try { 
+        Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction Stop
+        continue 
+    } catch {}
 
-    # 3. Unlock & Retry
+    # 4. Unlock & Retry
     try {
         $l = [RM]::GetLocks($T)
         if ($l.Count -gt 0) {
             foreach ($id in $l) {
                 try {
                     $pr = Get-Process -Id $id -ErrorAction Stop
-                    if ($CriticalProcesses -notcontains $pr.ProcessName) { Stop-Process -Id $id -Force -ErrorAction 0 }
+                    if ($CriticalProcesses -notcontains $pr.ProcessName) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
                 } catch {}
             }
             Start-Sleep -Milliseconds 200
+            
+            # Retry with UNC path first
+            try { Remove-Item -LiteralPath $UNC -Recurse -Force -ErrorAction Stop; continue } catch {}
             try { Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction Stop; continue } catch { $err = $_.Exception.Message }
-        } else { $err = "Access Denied" }
+        } else { 
+            $err = "Access Denied or Reserved Name" 
+        }
     } catch { $err = $_.Exception.Message }
     
     $Failed += "$T`nError: $err"
