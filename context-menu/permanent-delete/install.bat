@@ -11,13 +11,8 @@ if %errorLevel% neq 0 (
 )
 
 echo ========================================================
-echo      永久秒删工具 v3.0 (极速无感版)
+echo      永久秒删工具 v3.5
 echo ========================================================
-echo.
-echo 新版特性:
-echo   - 🚀 极速启动: 使用 VBS 替代 PowerShell 作为入口
-echo   - 👻 完全无感: 普通删除无黑框、无弹窗
-echo   - 💪 智能强力: 仅在需要时自动调用 PowerShell 解锁
 echo.
 
 set "TARGET_DIR=C:\Scripts"
@@ -27,16 +22,20 @@ set "SOURCE_DIR=%~dp0"
 if not exist "%TARGET_DIR%" mkdir "%TARGET_DIR%"
 
 :: 2. Copy Scripts
-echo [1/2] 复制脚本文件...
+echo [1/3] 复制脚本文件...
 copy /Y "%SOURCE_DIR%PermanentDelete.ps1" "%TARGET_DIR%\"
 copy /Y "%SOURCE_DIR%Wrapper.vbs" "%TARGET_DIR%\"
 
-:: 3. Register Context Menu
-echo [2/2] 注册右键菜单...
+:: 3. Unblock files (remove network download security mark)
+echo [2/3] 解除网络下载安全标记...
+powershell -NoProfile -Command "Unblock-File -Path '%TARGET_DIR%\Wrapper.vbs'; Unblock-File -Path '%TARGET_DIR%\PermanentDelete.ps1'"
+
+:: 4. Register Context Menu
+echo [3/3] 注册右键菜单...
 reg import "%SOURCE_DIR%Add-PermanentDelete-ContextMenu.reg"
 
 echo.
 echo ========================================================
-echo 安装完成!
+echo 安装完成! 不会再弹出安全警告了。
 echo ========================================================
 pause
