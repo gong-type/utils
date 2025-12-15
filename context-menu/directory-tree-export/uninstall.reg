@@ -1,0 +1,11 @@
+Windows Registry Editor Version 5.00
+
+; ============================================================
+; 目录结构导出工具 - 移除右键菜单
+; ============================================================
+
+; 移除文件夹空白处右键菜单
+[-HKEY_CLASSES_ROOT\Directory\Background\shell\ExportTree]
+
+; 移除文件夹右键菜单
+[-HKEY_CLASSES_ROOT\Directory\shell\ExportTree]

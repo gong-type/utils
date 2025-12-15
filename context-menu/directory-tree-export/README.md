@@ -1,36 +1,107 @@
-# 目录结构导出工具（右键菜单版）
+# 目录结构导出工具
 
-导出指定目录的树形结构，支持设置深度、忽略文件夹、导出到文件或剪贴板。
+导出指定目录的树形结构，支持**实时预览**、**键盘快捷键切换深度**、**自定义过滤**等功能。
 
-## 亮点
-- 右键菜单弹出 GUI，配置深度和忽略列表
-- 默认忽略常见目录：`node_modules, .git, bin, obj, .vs, dist, build, __pycache__`
-- 支持导出到目标目录 / 桌面 / 剪贴板，且可自动打开结果
+## ✨ 功能特性
 
-## 文件
-- `ExportTree-ContextMenu.ps1`：右键菜单 GUI 版脚本
-- `Add-ExportTree-ContextMenu.reg`：添加右键菜单
-- `Remove-ExportTree-ContextMenu.reg`：移除右键菜单
-- `Export-DirectoryTree.ps1`：命令行交互版（可选）
-- `使用说明.md`：详细指南与示例
+| 功能 | 说明 |
+|------|------|
+| 实时预览 | 右键点击后立即显示目录树预览 |
+| 快捷键切换 | 按 `1-9` 数字键即时切换预览深度 |
+| 显示大小 | 支持显示文件和文件夹大小 |
+| 显示日期 | 支持显示修改日期 |
+| 智能过滤 | 支持通配符过滤，提供预设模板 |
+| 一键复制 | Ctrl+C 快速复制到剪贴板 |
+| 导出文件 | 支持保存为 txt/md 格式 |
 
-## 安装（右键菜单版）
-1. 复制脚本到 `C:\Scripts\`
+## 📁 文件结构
+
+```
+directory-tree-export/
+├── ExportTree.ps1    # 主脚本 (GUI + 实时预览)
+├── install.bat       # 一键安装脚本
+├── install.reg       # 添加右键菜单
+├── uninstall.reg     # 移除右键菜单
+└── README.md         # 说明文档
+```
+
+## 🚀 安装
+
+### 方法一：一键安装（推荐）
+
+1. **双击运行** `install.bat`
+2. 如提示管理员权限，点击"是"
+3. 完成！
+
+### 方法二：手动安装
+
+```powershell
+# 1. 创建脚本目录
+mkdir C:\Scripts -Force
+
+# 2. 复制脚本
+copy ExportTree.ps1 C:\Scripts\
+
+# 3. 双击运行 install.reg 导入注册表
+```
+
+## ⌨️ 快捷键
+
+| 按键 | 功能 |
+|------|------|
+| `1-9` | 切换深度 1-9 层 |
+| `0` | 切换深度 10 层 |
+| `Ctrl+C` | 复制到剪贴板 |
+| `Ctrl+S` | 保存到文件 |
+| `F5` | 刷新预览 |
+| `Esc` | 关闭窗口 |
+
+## 🎛️ 使用方法
+
+1. 在文件夹上**右键** → 选择 **"目录结构导出"**
+2. 或在文件夹空白处**右键** → 选择 **"目录结构导出"**
+
+### 选项说明
+
+- **显示文件**: 是否在树中显示文件
+- **显示大小**: 显示文件和文件夹大小
+- **显示日期**: 显示最后修改日期
+
+### 预设模板
+
+| 预设 | 用途 | 忽略内容 |
+|------|------|----------|
+| **开发模式** | 软件开发项目 | node_modules, .git, bin, obj, dist, build 等 |
+| **精简模式** | 基本过滤 | 隐藏文件 (.*), node_modules, __pycache__ |
+
+## 📝 输出示例
+
+```
+my-project  [125.3 MB]
+|-- src  [45.2 MB]
+|   |-- components  [12.1 MB]
+|   |   |-- Header.tsx  [2.3 KB]  (2024-01-15)
+|   |   +-- Footer.tsx  [1.8 KB]  (2024-01-15)
+|   +-- index.ts  [0.5 KB]  (2024-01-20)
+|-- docs  [5.2 MB]
+|   +-- README.md  [5.2 KB]  (2024-01-18)
++-- package.json  [1.2 KB]  (2024-01-20)
+```
+
+## 🗑️ 卸载
+
+1. 双击运行 `uninstall.reg`
+2. 删除 `C:\Scripts\ExportTree.ps1`
+
+## ⚠️ 注意事项
+
+1. **执行策略**: 首次运行如被限制，请以管理员身份运行：
    ```powershell
-   mkdir C:\Scripts -Force
-   copy ExportTree-ContextMenu.ps1 C:\Scripts\
+   Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
    ```
-2. 双击运行 `Add-ExportTree-ContextMenu.reg`，确认导入注册表。
 
-## 使用
-- 在文件夹或其空白处右键 → 选择“输出结构树” → 在弹窗中配置后导出。
+2. **大目录提示**: 勾选"显示大小"后，大目录加载可能较慢
 
-## 卸载
-双击运行 `Remove-ExportTree-ContextMenu.reg`。
+## 📄 License
 
-## 注意
-- 脚本需保存为 **UTF-16 LE** 以兼容 PowerShell 5.1。
-- 首次运行如被执行策略限制，可在管理员 PowerShell 执行：
-  ```powershell
-  Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-  ```
+MIT License
