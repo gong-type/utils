@@ -20,10 +20,20 @@ function Get-DirectoryTree {
     param ([string]$RootPath, [int]$MaxDepth, [string[]]$IgnoreList, [bool]$ShowFiles, [bool]$ShowSize, [bool]$ShowDate)
     $script:TreeLines = [System.Collections.ArrayList]::new()
     $script:FileCount = 0; $script:DirCount = 0
-    $resolvedPath = Resolve-Path $RootPath -ErrorAction SilentlyContinue
+    
+    # Handle root path - ensure it ends with backslash for root directories
+    $normalizedPath = $RootPath.TrimEnd('\')
+    if ($normalizedPath -match '^[A-Za-z]:$') {
+        $normalizedPath = $normalizedPath + '\'
+    }
+    
+    $resolvedPath = Resolve-Path $normalizedPath -ErrorAction SilentlyContinue
     if (-not $resolvedPath) { return @("Error: $RootPath") }
-    $rootName = Split-Path $resolvedPath -Leaf
-    if ([string]::IsNullOrEmpty($rootName)) { $rootName = $resolvedPath.Path }
+    
+    $fullPath = $resolvedPath.Path
+    $rootName = Split-Path $fullPath -Leaf
+    # For drive roots like C:\, use the full path as the name
+    if ([string]::IsNullOrEmpty($rootName)) { $rootName = $fullPath }
     
     # Show root folder with size if enabled
     $rootLine = $rootName
