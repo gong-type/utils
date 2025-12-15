@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
 :: Check for Administrator privileges
@@ -10,31 +11,32 @@ if %errorLevel% neq 0 (
 )
 
 echo ========================================================
-echo       Install Permanent Delete Tool
+echo      永久秒删工具 v3.0 (极速无感版)
 echo ========================================================
+echo.
+echo 新版特性:
+echo   - 🚀 极速启动: 使用 VBS 替代 PowerShell 作为入口
+echo   - 👻 完全无感: 普通删除无黑框、无弹窗
+echo   - 💪 智能强力: 仅在需要时自动调用 PowerShell 解锁
 echo.
 
 set "TARGET_DIR=C:\Scripts"
 set "SOURCE_DIR=%~dp0"
 
 :: 1. Create Directory
-if not exist "%TARGET_DIR%" (
-    echo [1/3] Creating %TARGET_DIR%...
-    mkdir "%TARGET_DIR%"
-) else (
-    echo [1/3] Target directory exists.
-)
+if not exist "%TARGET_DIR%" mkdir "%TARGET_DIR%"
 
-:: 2. Copy Script
-echo [2/3] Copying scripts...
+:: 2. Copy Scripts
+echo [1/2] 复制脚本文件...
 copy /Y "%SOURCE_DIR%PermanentDelete.ps1" "%TARGET_DIR%\"
+copy /Y "%SOURCE_DIR%Wrapper.vbs" "%TARGET_DIR%\"
 
 :: 3. Register Context Menu
-echo [3/3] Registering context menu...
+echo [2/2] 注册右键菜单...
 reg import "%SOURCE_DIR%Add-PermanentDelete-ContextMenu.reg"
 
 echo.
 echo ========================================================
-echo Installation Complete!
-echo.
+echo 安装完成!
+echo ========================================================
 pause
