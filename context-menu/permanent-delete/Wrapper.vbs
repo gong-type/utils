@@ -1,8 +1,8 @@
 Option Explicit
 
 ' ==============================================================================
-' Permanent Delete Wrapper - Pure Speed Edition v3.4
-' Added: Support for Windows reserved names (nul, con, aux, etc.)
+' Permanent Delete Wrapper - Pure Speed Edition v3.6
+' Fix: Skip VBS delete for exe/msi/bat files to avoid SmartScreen warnings
 ' ==============================================================================
 
 Const FOR_WRITING = 2
@@ -21,9 +21,13 @@ strTempDir = objShell.ExpandEnvironmentStrings("%TEMP%")
 strQueueDir = objFSO.BuildPath(strTempDir, "PD_Queue_v3")
 strLockFile = objFSO.BuildPath(strQueueDir, "PD_Master.lock")
 
-' Windows Reserved Names (case-insensitive)
+' Windows Reserved Names
 Dim reservedNames
 reservedNames = Array("con","prn","aux","nul","com1","com2","com3","com4","com5","com6","com7","com8","com9","lpt1","lpt2","lpt3","lpt4","lpt5","lpt6","lpt7","lpt8","lpt9")
+
+' Executable extensions that may trigger SmartScreen warnings
+Dim exeExtensions
+exeExtensions = Array(".exe",".msi",".bat",".cmd",".com",".scr",".pif",".vbs",".vbe",".js",".jse",".wsf",".wsh",".ps1",".msc")
 
 ' Ensure Queue Directory
 If Not objFSO.FolderExists(strQueueDir) Then
@@ -62,15 +66,28 @@ Function TryAcquireLock()
     On Error GoTo 0
 End Function
 
+' Check if file is an executable type (may trigger SmartScreen)
+Function IsExecutable(strPath)
+    IsExecutable = False
+    Dim ext, i
+    ext = LCase(objFSO.GetExtensionName(strPath))
+    If ext <> "" Then ext = "." & ext
+    
+    For i = 0 To UBound(exeExtensions)
+        If ext = exeExtensions(i) Then
+            IsExecutable = True
+            Exit Function
+        End If
+    Next
+End Function
+
 ' Check if path contains Windows reserved names
 Function HasReservedName(strPath)
     HasReservedName = False
     Dim i, baseName, parts, p
     
-    ' Check each path component
     parts = Split(strPath, "\")
     For Each p In parts
-        ' Get base name without extension
         baseName = LCase(p)
         If InStr(baseName, ".") > 0 Then
             baseName = Left(baseName, InStr(baseName, ".") - 1)
@@ -83,6 +100,23 @@ Function HasReservedName(strPath)
             End If
         Next
     Next
+End Function
+
+' Check if path should skip VBS and go directly to PowerShell
+Function ShouldSkipVBS(strPath)
+    ShouldSkipVBS = False
+    
+    ' Skip executables (avoid SmartScreen)
+    If IsExecutable(strPath) Then
+        ShouldSkipVBS = True
+        Exit Function
+    End If
+    
+    ' Skip reserved names
+    If HasReservedName(strPath) Then
+        ShouldSkipVBS = True
+        Exit Function
+    End If
 End Function
 
 Sub ProcessQueue()
@@ -116,8 +150,9 @@ Sub ProcessQueue()
                 If strTarget <> "" Then
                     bDeleted = False
                     
-                    ' Check for reserved names - skip VBS, go directly to PS
-                    If HasReservedName(strTarget) Then
+                    ' Check if should skip VBS processing
+                    If ShouldSkipVBS(strTarget) Then
+                        ' Send directly to PowerShell
                         failedPaths = failedPaths & " """ & strTarget & """"
                     Else
                         ' Standard VBS fast delete
@@ -129,10 +164,8 @@ Sub ProcessQueue()
                             objFSO.DeleteFolder strTarget, True
                             If Err.Number = 0 Then bDeleted = True
                         Else
-                            ' Path doesn't exist via FSO, might be reserved name
-                            ' Send to PS for \\?\ handling
                             failedPaths = failedPaths & " """ & strTarget & """"
-                            bDeleted = True ' Mark as handled
+                            bDeleted = True
                         End If
                         
                         If Not bDeleted Then
