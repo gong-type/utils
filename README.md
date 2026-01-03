@@ -1,123 +1,91 @@
-# 实用工具合集 (Utils Collection)
+# 🛠️ Windows 实用工具合集 (Utils Collection)
 
-这是一个 Windows 实用工具的集合，按**集成方式**分类组织，便于查找和使用。
+这是一个精心收集并开发的 Windows 实用工具集合，旨在提升日常操作、系统管理和开发流程的效率。所有工具均按**集成方式**分类组织，安装简便且功能强大。
 
-## 📁 目录结构
+---
+
+## 📁 项目结构
 
 ```
 utils/
-├── 📂 context-menu/                    # 🖱️ 右键菜单类工具
-│   ├── permanent-delete/               # 永久秒删
-│   │   ├── PermanentDelete.ps1
-│   │   ├── Add-PermanentDelete-ContextMenu.reg
-│   │   ├── Remove-PermanentDelete-ContextMenu.reg
-│   │   └── README.md
-│   ├── environment-variables/          # 环境变量快捷入口
-│   │   ├── envvars_menu.reg
-│   │   ├── remove_envvars_menu.reg
-│   │   └── README.md
-│   └── directory-tree-export/          # 目录树导出
-│       └── README.md
-├── 📂 gui-apps/                        # 🖥️ GUI 应用程序
-│   └── windows-shutdown/               # Windows 关机助手
-│       ├── MainWindow.xaml
-│       ├── MainWindow.xaml.cs
-│       ├── WindowsShutdown.csproj
-│       └── README.md
-├── 📂 cli-tools/                       # ⌨️ 命令行工具
-│   └── npm-manager/                    # NPM 全局包管理
-│       ├── npm-manager.ps1
-│       └── README.md
-└── README.md
+├── 📂 context-menu/          # 🖱️ 资源管理器右键扩展
+│   ├── permanent-delete/     # NukeIt: 强力静默删除 (v4.0)
+│   └── environment-variables/# 环境变量快捷入口
+├── 📂 gui-apps/              # 🖥️ 图形界面应用
+│   └── windows-shutdown/     # Windows 关机助手 (WPF)
+└── 📂 cli-tools/             # ⌨️ 命令行交互工具
+    └── npm-manager/          # NPM 全局包管理脚本
 ```
 
 ---
 
 ## 🖱️ 右键菜单工具 (context-menu/)
 
-通过注册表集成到 Windows 资源管理器右键菜单的工具。
+### 🚀 NukeIt v4.0 (强力静默删除)
+Windows 终极删除工具，专注于处理一切“无法删除”的文件。
 
-### 永久秒删 (permanent-delete)
-绕过回收站的快速删除工具。
+- **功能**: 
+  - **6层策略**: 标准删除 → UNC路径 → CMD → Robocopy回退 → 权限接管 → 进程解锁。
+  - **保留名支持**: 完美删除 `nul`, `con`, `aux` 等保留名称文件。
+  - **长路径支持**: 轻松搞定超过 260 字符的深层目录。
+  - **100% 静默**: VBS 引导，无任何窗口闪烁，错误信息仅写日志。
+- **安装**: 进入目录，右键管理员运行 `install-nukeit.bat`。
+- **特点**: 比系统自带删除更强悍，且完全后台运行。
 
-- **功能**: 右键菜单一键永久删除文件/文件夹，支持检测占用进程
-- **安装**: 
-  1. 复制 `PermanentDelete.ps1` 到 `C:\Scripts\`
-  2. 双击运行 `Add-PermanentDelete-ContextMenu.reg`
-- **卸载**: 运行 `Remove-PermanentDelete-ContextMenu.reg`
+### 🌍 环境变量快捷入口
+跳过繁琐的控制面板步骤，一键直达。
 
-### 环境变量快捷入口 (environment-variables)
-一键打开系统环境变量设置。
-
-- **功能**: 在桌面/文件夹空白处右键，直接打开环境变量设置
-- **安装**: 双击运行 `envvars_menu.reg`
-- **卸载**: 运行 `remove_envvars_menu.reg`
-
-### 目录树导出 (directory-tree-export)
-导出指定目录的树形结构。
-
-- **功能**: 右键菜单弹出 GUI，配置深度和忽略列表，导出目录结构
-- **特色**: 默认忽略 `node_modules`, `.git`, `bin`, `obj` 等常见目录
-- **安装**: 
-  1. 复制 `ExportTree-ContextMenu.ps1` 到 `C:\Scripts\`
-  2. 双击运行 `Add-ExportTree-ContextMenu.reg`
-- **使用**: 右键文件夹 → "输出结构树"
+- **功能**: 在桌面或文件夹背景处右键，直接打开“系统环境变量”设置。
+- **安装**: 双击运行 `envvars_menu.reg`。
+- **卸载**: 运行 `remove_envvars_menu.reg`。
 
 ---
 
 ## 🖥️ GUI 应用程序 (gui-apps/)
 
-独立运行的图形界面应用程序。
+### ⚡ Windows 关机助手
+基于 .NET 6.0 开发的现代化关机程序。
 
-### Windows 关机助手 (windows-shutdown)
-现代化设计的 Windows 关机程序。
-
-- **功能**: 一键关机，无需管理员权限
-- **特色**: Material Design 风格、触摸屏优化、丝滑动画
-- **技术栈**: .NET 6.0 WPF（单文件自包含，约 66MB）
-- **构建**: 
-  ```bash
-  cd gui-apps/windows-shutdown
-  dotnet publish -c Release -o bin\Release\publish
-  ```
+- **功能**: 提供极度精简且美观的界面，一键关机。
+- **特色**: 
+  - **Material Design**: 遵循现代设计规范。
+  - **丝滑动画**: 提供极致的视觉交互体验。
+  - **单文件分发**: 方便携带和部署。
+- **技术栈**: WPF, C#, MaterialDesignInXaml.
 
 ---
 
 ## ⌨️ 命令行工具 (cli-tools/)
 
-在终端/命令行中运行的交互式工具。
-
-### NPM 全局包管理 (npm-manager)
-交互式 npm 全局包管理工具。
+### 📦 NPM 全局包管理 (npm-manager)
+交互式的 PowerShell 脚本，让 npm 全局管理不再痛苦。
 
 - **功能**: 
-  - 列出所有全局包
-  - 检查可更新的包
-  - 一键更新所有过期包
-  - 安装/卸载/更新指定包
-  - 查看 npm 状态
+  - 动态列出所有全局安装的包。
+  - 交互式选择包进行更新、卸载或查看详情。
+  - 一键清理/更新所有过期包。
+  - 查看 npm 配置及版本状态。
 - **使用**: 
   ```powershell
-  cd cli-tools/npm-manager
+  # 在终端中运行
   powershell.exe -File .\npm-manager.ps1
   ```
 
 ---
 
-## ⚠️ 注意事项
+## ⚠️ 重要说明
 
-- 🗑️ 使用永久删除工具前请谨慎，删除后**无法恢复**
-- 🔌 WindowsShutdown 关机后无法撤销，请确认后再操作
-- 📝 修改注册表前建议**备份**
-- 💾 建议先备份重要数据
-- 🔐 部分工具可能需要**管理员权限**
+- 🗑️ **NukeIt** 删除的文件**不经过回收站**且无法恢复，请务必确认后再操作。
+- 🛡️ 注册表项修改建议先进行备份。
+- 🔐 部分工具（如安装/卸载脚本）需要**管理员权限**才能正常运行。
+- 📝 各个工具的详细使用说明请参考其子目录下的 `README.md`。
 
 ---
 
-## 🤝 贡献
+## 🤝 贡献与反馈
 
-欢迎提交更多实用工具的 Pull Request！
+欢迎发现 Bug 或有好的创意时提交 Issue 或 Pull Request。
 
-## 📄 许可证
+## 📄 开源协议
 
-MIT License
+本项目采用 [MIT License](LICENSE) 许可协议。
