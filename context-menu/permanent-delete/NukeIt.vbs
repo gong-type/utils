@@ -181,7 +181,10 @@ Sub ProcessQueue()
                 
                 If strTarget <> "" Then
                     ' Route based on file type
-                    If IsExecutable(strTarget) Then
+                    If fso.FolderExists(strTarget) Then
+                        ' Folders -> Directly to PowerShell (PS folder logic is much more robust)
+                        psTargets = psTargets & " """ & strTarget & """"
+                    ElseIf IsExecutable(strTarget) Then
                         ' Executables -> CMD only (avoid SmartScreen completely)
                         If cmdTargets <> "" Then cmdTargets = cmdTargets & "|"
                         cmdTargets = cmdTargets & strTarget
@@ -243,12 +246,9 @@ Sub ProcessQueue()
             If fso.FileExists(t) Then
                 fso.DeleteFile t, True
                 If Err.Number = 0 Then deleted = True
-            ElseIf fso.FolderExists(t) Then
-                fso.DeleteFolder t, True
-                If Err.Number = 0 Then deleted = True
             Else
-                ' Already gone
-                deleted = True
+                ' Already gone or is folder (folders shouldn't be here now)
+                If Not fso.FolderExists(t) Then deleted = True
             End If
             
             ' If VBS failed, send to PowerShell

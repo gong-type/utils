@@ -185,102 +185,106 @@ try {
 # Deletion Methods (Ordered by aggression level)
 # ============================================================================
 
-# Method 1: Standard PowerShell Remove-Item
-function Remove-Standard {
-    param([string]$Path)
-    Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
-}
+# ============================================================================
+# Deletion Methods (Optimized & Targeted)
+# ============================================================================
 
-# Method 2: UNC Path deletion (handles reserved names, long paths)
-function Remove-UNC {
+# Method: Unlock processes holding a path
+function Invoke-Unlock {
     param([string]$Path)
-    $unc = Get-UNCPath $Path
-    Remove-Item -LiteralPath $unc -Recurse -Force -ErrorAction Stop
-}
-
-# Method 3: CMD del/rmdir (sometimes works when PS fails)
-function Remove-CMD {
-    param([string]$Path)
-    $unc = Get-UNCPath $Path
-    
-    if (Test-Path -LiteralPath $Path -PathType Leaf -ErrorAction SilentlyContinue) {
-        $result = cmd /c "del /f /q /a `"$unc`"" 2>&1
-    } else {
-        $result = cmd /c "rd /s /q `"$unc`"" 2>&1
-    }
-    
-    if (Test-PathExists $Path) {
-        throw "CMD delete failed: $result"
-    }
-}
-
-# Method 4: Robocopy mirror (empty folder trick)
-function Remove-Robocopy {
-    param([string]$Path)
-    
-    if (-not (Test-Path -LiteralPath $Path -PathType Container -ErrorAction SilentlyContinue)) {
-        throw "Robocopy only works for folders"
-    }
-    
-    $emptyDir = "$env:TEMP\NukeIt_Empty_$(Get-Random)"
-    New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
     
     try {
-        $result = robocopy $emptyDir $Path /MIR /NFL /NDL /NJH /NJS /NC /NS /NP 2>&1
-        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
-    } finally {
-        Remove-Item -LiteralPath $emptyDir -Force -ErrorAction SilentlyContinue
+        $pids = [RestartManager]::GetLockingProcesses($Path)
+        if ($pids.Count -gt 0) {
+            Write-Log "Found $($pids.Count) locking processes for: $Path" "WARN"
+            foreach ($pid in $pids) {
+                try {
+                    $proc = Get-Process -Id $pid -ErrorAction Stop
+                    if ($CriticalProcesses -notcontains $proc.ProcessName) {
+                        Write-Log "Terminating process: $($proc.ProcessName) (PID: $pid)" "WARN"
+                        Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+                    }
+                } catch {}
+            }
+            Start-Sleep -Milliseconds 200
+        }
+    } catch {
+        Write-Log "Unlock failed for $Path: $($_.Exception.Message)" "DEBUG"
     }
 }
 
-# Method 5: Take ownership and reset permissions
-function Remove-WithOwnership {
+# Method: Take ownership and reset permissions
+function Invoke-TakeOwnership {
     param([string]$Path)
     
     $unc = Get-UNCPath $Path
+    Write-Log "Taking ownership of: $Path" "INFO"
     
     # Take ownership
     takeown /f $unc /r /d y 2>&1 | Out-Null
     
-    # Reset permissions
+    # Reset permissions (standard reset + explicit grant to current user)
     icacls $unc /reset /t /c /q 2>&1 | Out-Null
-    icacls $unc /grant "${env:USERNAME}:F" /t /c /q 2>&1 | Out-Null
-    
-    # Try delete again
-    Remove-Item -LiteralPath $unc -Recurse -Force -ErrorAction Stop
+    icacls $unc /grant "${env:USERNAME}:(OI)(CI)F" /t /c /q 2>&1 | Out-Null
 }
 
-# Method 6: Unlock processes and retry
-function Remove-WithUnlock {
+# Method: Optimized Folder Deletion
+function Invoke-FolderNuke {
     param([string]$Path)
     
-    $pids = [RestartManager]::GetLockingProcesses($Path)
-    
-    if ($pids.Count -eq 0) {
-        throw "No locking processes found"
-    }
-    
-    foreach ($pid in $pids) {
-        try {
-            $proc = Get-Process -Id $pid -ErrorAction Stop
-            if ($CriticalProcesses -notcontains $proc.ProcessName) {
-                Write-Log "Terminating process: $($proc.ProcessName) (PID: $pid)" "WARN"
-                Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
-            } else {
-                Write-Log "Skipping critical process: $($proc.ProcessName) (PID: $pid)" "WARN"
-            }
-        } catch {}
-    }
-    
-    Start-Sleep -Milliseconds 300
-    
-    # Retry with UNC
     $unc = Get-UNCPath $Path
-    Remove-Item -LiteralPath $unc -Recurse -Force -ErrorAction Stop
+    
+    # 1. Proactive Unlock
+    Invoke-Unlock $Path
+    
+    # 2. Try Standard RD first (fast for small/unlocked folders)
+    cmd /c "rd /s /q `"$unc`"" 2>&1 | Out-Null
+    if (-not (Test-PathExists $Path)) { return $true }
+    
+    # 3. Empty folder using Robocopy mirror trick (extremely fast and robust)
+    Write-Log "Using Robocopy mirror to empty: $Path" "INFO"
+    $emptyDir = "$env:TEMP\NukeIt_Empty_$(Get-Random)"
+    New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
+    try {
+        robocopy $emptyDir $Path /MIR /NFL /NDL /NJH /NJS /NC /NS /NP /R:0 /W:0 2>&1 | Out-Null
+    } finally {
+        Remove-Item -LiteralPath $emptyDir -Force -ErrorAction SilentlyContinue
+    }
+    
+    # 4. Final destruction
+    cmd /c "rd /s /q `"$unc`"" 2>&1 | Out-Null
+    
+    # 5. Fallback: Take ownership if still exists
+    if (Test-PathExists $Path) {
+        Invoke-TakeOwnership $Path
+        cmd /c "rd /s /q `"$unc`"" 2>&1 | Out-Null
+    }
+    
+    return (-not (Test-PathExists $Path))
+}
+
+# Method: Optimized File Deletion
+function Invoke-FileNuke {
+    param([string]$Path)
+    
+    $unc = Get-UNCPath $Path
+    
+    # 1. Proactive Unlock
+    Invoke-Unlock $Path
+    
+    # 2. Standard CMD delete (handles RO, hidden, system)
+    cmd /c "del /f /q /a `"$unc`"" 2>&1 | Out-Null
+    if (-not (Test-PathExists $Path)) { return $true }
+    
+    # 3. Fallback: Take ownership
+    Invoke-TakeOwnership $Path
+    cmd /c "del /f /q /a `"$unc`"" 2>&1 | Out-Null
+    
+    return (-not (Test-PathExists $Path))
 }
 
 # ============================================================================
-# Main Deletion Logic
+# Main Routing Logic
 # ============================================================================
 function Invoke-Nuke {
     param([string]$Path)
@@ -294,109 +298,36 @@ function Invoke-Nuke {
         return $true
     }
     
-    $isExe = Test-IsExecutable $Path
     $unc = Get-UNCPath $Path
-    
-    # For executables: Use CMD only to avoid SmartScreen
-    if ($isExe) {
-        Write-Log "Executable detected, using CMD-only path: $Path"
-        
-        # Method 1: CMD del with UNC path
-        $result = cmd /c "del /f /q /a `"$unc`"" 2>&1
-        if (-not (Test-PathExists $Path)) {
-            Write-Log "SUCCESS [CMD-EXE]: $Path"
-            return $true
-        }
-        
-        # Method 2: CMD del with normal path
-        $result = cmd /c "del /f /q /a `"$Path`"" 2>&1
-        if (-not (Test-PathExists $Path)) {
-            Write-Log "SUCCESS [CMD-EXE]: $Path"
-            return $true
-        }
-        
-        # Method 3: attrib to remove readonly, then delete
-        cmd /c "attrib -r -s -h `"$unc`"" 2>&1 | Out-Null
-        $result = cmd /c "del /f /q /a `"$unc`"" 2>&1
-        if (-not (Test-PathExists $Path)) {
-            Write-Log "SUCCESS [CMD-ATTRIB-EXE]: $Path"
-            return $true
-        }
-        
-        # Method 4: Unlock and retry (minimal PS interaction)
-        try {
-            $pids = [RestartManager]::GetLockingProcesses($Path)
-            if ($pids.Count -gt 0) {
-                foreach ($pid in $pids) {
-                    try {
-                        $proc = Get-Process -Id $pid -ErrorAction Stop
-                        if ($CriticalProcesses -notcontains $proc.ProcessName) {
-                            Write-Log "Terminating process: $($proc.ProcessName) (PID: $pid)" "WARN"
-                            taskkill /F /PID $pid 2>&1 | Out-Null
-                        }
-                    } catch {}
-                }
-                Start-Sleep -Milliseconds 300
-                $result = cmd /c "del /f /q /a `"$unc`"" 2>&1
-                if (-not (Test-PathExists $Path)) {
-                    Write-Log "SUCCESS [CMD-UNLOCK-EXE]: $Path"
-                    return $true
-                }
-            }
-        } catch {}
-        
-        Write-Log "FAILED all CMD methods for executable: $Path" "ERROR"
-        return $false
+    $isContainer = (Get-Item -LiteralPath $unc -Force -ErrorAction SilentlyContinue).PSIsContainer
+    if ($null -eq $isContainer) {
+        $isContainer = (Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue).PSIsContainer
     }
     
-    # For non-executables: Use full method chain
-    # Clear read-only attributes
+    # Clear Read-Only attribute on target itself first
     try {
-        $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
-        if ($null -eq $item) {
-            $item = Get-Item -LiteralPath $unc -Force -ErrorAction SilentlyContinue
-        }
-        
-        if ($null -ne $item) {
-            if ($item.Attributes -band [System.IO.FileAttributes]::ReadOnly) {
-                $item.Attributes = $item.Attributes -bxor [System.IO.FileAttributes]::ReadOnly
-            }
-            
-            if ($item.PSIsContainer) {
-                Get-ChildItem -LiteralPath $unc -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object {
-                    if ($_.Attributes -band [System.IO.FileAttributes]::ReadOnly) {
-                        $_.Attributes = $_.Attributes -bxor [System.IO.FileAttributes]::ReadOnly
-                    }
-                }
-            }
+        $item = Get-Item -LiteralPath $unc -Force -ErrorAction SilentlyContinue
+        if ($item.Attributes -band [System.IO.FileAttributes]::ReadOnly) {
+            $item.Attributes = $item.Attributes -bxor [System.IO.FileAttributes]::ReadOnly
         }
     } catch {}
     
-    # Try deletion methods in order
-    $methods = @(
-        @{ Name = "Standard";      Func = { Remove-Standard $Path } },
-        @{ Name = "UNC";           Func = { Remove-UNC $Path } },
-        @{ Name = "CMD";           Func = { Remove-CMD $Path } },
-        @{ Name = "Robocopy";      Func = { Remove-Robocopy $Path } },
-        @{ Name = "WithOwnership"; Func = { Remove-WithOwnership $Path } },
-        @{ Name = "WithUnlock";    Func = { Remove-WithUnlock $Path } }
-    )
-    
-    foreach ($method in $methods) {
-        try {
-            & $method.Func
-            
-            if (-not (Test-PathExists $Path)) {
-                Write-Log "SUCCESS [$($method.Name)]: $Path"
-                return $true
-            }
-        } catch {
-            # Continue to next method
-        }
+    $success = $false
+    if ($isContainer) {
+        Write-Log "Target is FOLDER: $Path"
+        $success = Invoke-FolderNuke $Path
+    } else {
+        Write-Log "Target is FILE: $Path"
+        $success = Invoke-FileNuke $Path
     }
     
-    Write-Log "FAILED all methods: $Path" "ERROR"
-    return $false
+    if ($success) {
+        Write-Log "SUCCESS: $Path"
+        return $true
+    } else {
+        Write-Log "FAILED: $Path" "ERROR"
+        return $false
+    }
 }
 
 # ============================================================================
